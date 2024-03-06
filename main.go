@@ -155,50 +155,56 @@ func run(workdir, name string, args ...string) ([]byte, error) {
 	return buffer.Bytes(), err
 }
 
+// createSigner creates a signer based on the provided private key, mnemonic, or a ledger.
+// It returns an error if the provided inputs are invalid or if there's an issue with the ledger.
 func createSigner(privateKey, mnemonic, hdPath string) (signer, error) {
-	path, err := accounts.ParseDerivationPath(hdPath)
-	if err != nil {
-		return nil, err
-	}
+    // Parse the derivation path from the HD path string.
+    path, err := accounts.ParseDerivationPath(hdPath)
+    if err != nil {
+        return nil, fmt.Errorf("failed to parse derivation path: %w", err)
+    }
 
-	if privateKey != "" {
-		key, err := crypto.HexToECDSA(privateKey)
-		if err != nil {
-			return nil, fmt.Errorf("error parsing private key: %w", err)
-		}
-		return &ecdsaSigner{key}, nil
-	}
+    // If a private key is provided, use it to create an ECDSA signer.
+    if privateKey != "" {
+        key, err := crypto.HexToECDSA(privateKey)
+        if err != nil {
+            return nil, fmt.Errorf("error parsing private key: %w", err)
+        }
+        return &ecdsaSigner{key}, nil
+    }
 
-	if mnemonic != "" {
-		key, err := derivePrivateKey(mnemonic, path)
-		if err != nil {
-			return nil, fmt.Errorf("error deriving key from mnemonic: %w", err)
-		}
-		return &ecdsaSigner{key}, nil
-	}
+    // If a mnemonic is provided, derive the private key from it and create an ECDSA signer.
+    if mnemonic != "" {
+        key, err := derivePrivateKey(mnemonic, path)
+        if err != nil {
+            return nil, fmt.Errorf("error deriving key from mnemonic: %w", err)
+        }
+        return &ecdsaSigner{key}, nil
+    }
 
-	// assume using a ledger
-	ledgerHub, err := usbwallet.NewLedgerHub()
-	if err != nil {
-		return nil, fmt.Errorf("error starting ledger: %w", err)
-	}
-	wallets := ledgerHub.Wallets()
-	if len(wallets) == 0 {
-		return nil, fmt.Errorf("no ledgers found, please connect your ledger")
-	}
-	wallet := wallets[0]
-	if err := wallet.Open(""); err != nil {
-		return nil, fmt.Errorf("error opening ledger: %w", err)
-	}
-	account, err := wallet.Derive(path, true)
-	if err != nil {
-		return nil, fmt.Errorf("error deriving ledger account (have you unlocked?): %w", err)
-	}
-	return &walletSigner{
-		wallet:  wallet,
-		account: account,
-	}, nil
+    // If no private key or mnemonic is provided, assume using a ledger.
+    ledgerHub, err := usbwallet.NewLedgerHub()
+    if err != nil {
+        return nil, fmt.Errorf("error starting ledger: %w", err)
+    }
+    wallets := ledgerHub.Wallets()
+    if len(wallets) == 0 {
+        return nil, fmt.Errorf("no ledgers found, please connect your ledger")
+    }
+    wallet := wallets[0]
+    if err := wallet.Open(""); err != nil {
+        return nil, fmt.Errorf("error opening ledger: %w", err)
+    }
+    account, err := wallet.Derive(path, true)
+    if err != nil {
+        return nil, fmt.Errorf("error deriving ledger account (have you unlocked?): %w", err)
+    }
+    return &walletSigner{
+        wallet: wallet,
+        account: account,
+    }, nil
 }
+
 
 type signer interface {
 	address() common.Address
