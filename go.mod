@@ -1,4 +1,4 @@
-module github.com/base-org/eip712sign
+module github.com/ethereum-optimism/eip712sign
 
 go 1.21
 
